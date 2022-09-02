@@ -1,4 +1,4 @@
-# spotifyFlacDL
+# spotifyFlacDL - CLI
 Downloads FLAC audio files from public Spotify playlists
 
 
