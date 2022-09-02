@@ -23,7 +23,8 @@ parser = argparse.ArgumentParser()
 
 # add arguments
 parser.add_argument("-l", action="store_true", help="Download in mp3 instead (default is flac)")
-parser.add_argument("-c", "--Captcha", help="2Captcha Key")
+parser.add_argument("-c", "--Captcha")
+
 
 # read arguments
 args = parser.parse_args()
