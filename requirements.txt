@@ -1,0 +1,5 @@
+2captcha-python
+Pillow
+selenium
+selenium-wire
+tqdm
