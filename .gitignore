@@ -127,3 +127,8 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+spotifyFlacDL/
+captcha.json
+clientDetails.txt
+failedSongs.txt
+test.ipynb

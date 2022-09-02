@@ -1,34 +1,38 @@
+import sys
 from twocaptcha import TwoCaptcha
 from seleniumwire import webdriver
 from seleniumwire.utils import decode
 from tqdm import tqdm
-import music_tag
 import argparse
 import requests
 import json
 import os
+import spotipy
+from spotipy.oauth2 import SpotifyClientCredentials
+
+globalCount = 0
+
+musicPath = './spotifyFlacDL'
+
+if not os.path.exists(musicPath):
+    os.makedirs(musicPath)
+
 
 # initalize parser
 parser = argparse.ArgumentParser()
 
 # add arguments
-parser.add_argument("-s", "--Search", help="Search query")
-parser.add_argument("-o", "--Output", help="Download location")
+parser.add_argument("-l", action="store_true", help="Download in mp3 instead (default is flac)")
 parser.add_argument("-c", "--Captcha", help="2Captcha Key")
-parser.add_argument("-a", action="store_true", help="Search for album")
-parser.add_argument("-t", action="store_true", help="Search for track")
-parser.add_argument(
-    "-l", action="store_true", help="Download lossless .flac (default is mp3)"
-)
 
 # read arguments
 args = parser.parse_args()
 
 # handle file_type arg
 if args.l:
-    file_type = "flac"
-else:
     file_type = "mp3"
+else:
+    file_type = "flac"
 
 key = "k7xoeo5zc5osjouuaee4"
 cookie = "6c541eg0fv112k8p0em17of3i4"
@@ -43,7 +47,7 @@ headers_dict = {
 }
 
 
-def download_track(trackId, album_id):
+def download_track(trackId, album_id, trackName):
     # get album metadata from deezer
     album_req = requests.get("https://api.deezer.com/album/" + str(album_id))
     album = album_req.json()
@@ -65,95 +69,58 @@ def download_track(trackId, album_id):
         headers=headers_dict,
     )
     if download_req.text == "Incorrect captcha":
-        print("unknown captcha error")
-        exit()
+        print("unknown captcha error") 
+        # os.remove('./captcha.json')
+
+        resetCaptcha()
+        # sys.exit()
+        # globalCount += 1
+        # if globalCount > 2:
+        #     exit()
+        # try:
+        #     resetCaptcha()
+        # except:
+        #     exit()
     r = requests.get(download_req.content.strip(), stream=True) # create HTTP response object
     filelength = int(r.headers['Content-Length'])
   
     # send a HTTP request to the server and save
     # the HTTP response in a response object called r
-    with open(f'{album["tracks"]["data"][track_index]["title"]}.{file_type}','wb') as f:
-    
+    with open(f'./spotifyFlacDL/{trackName}.{file_type}','wb') as f:
         pbar = tqdm(total=int(filelength/1024))
         for chunk in r.iter_content(chunk_size=1024):
             if chunk:                   # filter out keep-alive new chunks
                 pbar.update ()
                 f.write(chunk)
-    # artist_name = album["artist"]["name"]
-    # album_name = album["title"]
-    # track_name = album["tracks"]["data"][track_index]["title"]
-    # # apply formatting for tags
-    # track_index += 1
-    # if track_index < 10:
-    #     track_index = str(0) + str(track_index)
-    # # handle output folder arg
-    # if args.Output:
-    #     folder = args.Output + "/" + artist_name + " - " + album_name
-    # else:
-    #     folder = artist_name + " - " + album_name
-    # # create album folder
-    # if not os.path.exists(folder):
-    #     os.makedirs(folder)
-    # # write data to file
-    # with open(
-    #     folder + "/" + str(track_index) + " - " +
-    #     track_name + "." + file_type, "wb"
-    # ) as f:
-    #     f.write(download_req.content)
-    # print(str(track_index) + " - " + track_name + "." + file_type)
-    # # set track metadata
-    # local_track = music_tag.load_file(
-    #     folder + "/" + str(track_index) + " - " + track_name + "." + file_type
-    # )
-    # local_track["tracktitle"] = track_name
-    # local_track["album artist"] = artist_name
-    # local_track["album"] = album_name
-    # local_track["trackNumber"] = track_index
-    # local_track["year"] = album["release_date"][0:4]
-    # # set artwork
-    # with open("cover.jpg", "rb") as img_in:
-    #     local_track["artwork"] = img_in.read()
-    # with open("cover.jpg", "rb") as img_in:
-    #     local_track.append_tag("artwork", img_in.read())
-    # local_track.save()
 
 
 def get_artwork(album_data):
-    cover_art_req = requests.get(
-        album_data["data"][0]["album"]["cover_xl"])
-    with open("cover.jpg", "wb") as f:
-        f.write(cover_art_req.content)
+    try:
+        cover_art_req = requests.get(
+            album_data["data"][0]["album"]["cover_xl"])
+        with open("cover.jpg", "wb") as f:
+            f.write(cover_art_req.content)
+        return True
+    except:
+        print('Could Not find artwork')
+        return False
 
 
-def album():
-    # get deezer album data
-    search_req_params = {"q": args.Search}
-    search_req = requests.get(
-        "https://api.deezer.com/search", search_req_params)
-    data = search_req.json()
-    if len(data["data"]) == 0:
-        print("album not found")
-        exit()
-    album_id = data["data"][0]["album"]["id"]
-    print("album found: " + str(album_id))
-    get_artwork(data)
-    album_req = requests.get("https://api.deezer.com/album/" + str(album_id))
-    data = album_req.json()
-    # download tracks
-    for track in data["tracks"]["data"]:
-        download_track(track["id"], data["id"])
-    # delete artwork file
-    os.remove("cover.jpg")
-
-
-def track():
+def track(name):
     # get deezer track data
-    search_req = requests.get("https://api.deezer.com/search?q=" + args.Search)
+    print(f'Downloading: {name}.{file_type}')
+    search_req = requests.get(f"https://api.deezer.com/search?q={name}")
     data = search_req.json()
-    get_artwork(data)
-    download_track(data["data"][0]["id"], data["data"][0]["album"]["id"])
+    # if get_artwork(data):
+    #     os.remove("cover.jpg")
+    try:
+        download_track(data["data"][0]["id"], data["data"][0]["album"]["id"], name)
+        return True
+    except:
+        print(f'Failed to download: {name}')
+        return False
     # delete artwork file
-    os.remove("cover.jpg")
+    
 
 
 def solve_captcha():
@@ -171,6 +138,8 @@ def solve_captcha():
     validate_captcha()
     return captcha
 
+def resetCaptcha():
+    check_stored_captcha()
 
 def validate_captcha():
     # download request params
@@ -183,8 +152,15 @@ def validate_captcha():
         headers=headers_dict,
     )
     if download_req.text == "Incorrect captcha":
+    
         print("unknown captcha error")
-        exit()
+        # os.remove('./captcha.json')
+        resetCaptcha()
+        # sys.exit()
+        # try:
+        #     resetCaptcha()
+        # except:
+        #     exit()
 
 
 def prompt_captcha():
@@ -262,10 +238,77 @@ def check_stored_captcha():
         global_captcha = handle_captcha()
 
 
-check_stored_captcha()
+def downloadTracks():
 
-# handle download type arg
-if args.a:
-    album()
-elif args.t:
-    track()
+    check_stored_captcha()
+
+    try:
+        with open('./clientDetails.txt') as f:
+            clientDetails = [line.strip() for line in f.readlines()]
+            print(clientDetails)
+    except FileNotFoundError:
+        print('Please Create "clientDetails.txt" file as described in readme.md')
+
+    CLIENT_ID = clientDetails[0]
+    CLIENT_SECRET = clientDetails[1]
+    PLAYLIST_LINK = input("Please enter PUBLIC playlist: ").strip()
+
+
+    CLIENT_CREDENTIALS_MANAGER = SpotifyClientCredentials(
+        client_id=CLIENT_ID, client_secret=CLIENT_SECRET
+    )
+    SP = spotipy.Spotify(client_credentials_manager=CLIENT_CREDENTIALS_MANAGER)
+
+
+    def get_playlist_uri(playlist_link):
+        return playlist_link.split("/")[-1].split("?")[0]
+
+
+    def get_tracks(tracks, page):
+        try:
+            page = max(0, (page*100)-1)
+            playlist_uri = get_playlist_uri(PLAYLIST_LINK)
+            for track in SP.playlist_tracks(playlist_uri, offset=page)["items"]:
+                # track_uri = track["track"]["uri"]
+                # track_name = track["track"]["name"]
+                # result = track_name, SP.audio_features(track_uri)
+                item = track['track']
+                tracks.append(item['album']['artists'][0]['name'] + ' - ' + item['name'])
+        except:
+            print("Oops something has gone wrong, please make sure the playlist is public and the link is correct. Otherwise submit an issue in the github repo. Sorry!")
+
+        if len(SP.playlist_tracks(playlist_uri, offset=page)["items"]) == 0:
+            return False
+        else:
+            return True
+
+    print('Getting Tracks')
+    allTracks = []
+    page = 0
+    while get_tracks(allTracks, page):
+        page += 1
+
+    allTracks = list(set(allTracks))
+
+    print(f'Found {len(allTracks)} unique tracks')
+
+    if len(allTracks) == 0:
+        print('No tracks in playlist')
+        exit()
+
+    failedTracks = []
+    # handle download type arg
+    for eachTrack in tqdm(allTracks):
+        if os.path.isfile(f'{musicPath}/{eachTrack}.{file_type}'):
+            print(f'File already exists: {eachTrack}.{file_type}')
+        elif not track(eachTrack):
+            failedTracks.append(eachTrack)
+        print()
+
+    print()
+    print(f'{len(allTracks)-len(failedTracks)}/{len(allTracks)} downloaded')
+    print()
+    print('Failed Tracks:')
+    print(failedTracks)
+
+downloadTracks()
