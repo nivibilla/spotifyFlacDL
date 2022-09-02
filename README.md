@@ -14,6 +14,7 @@ Example:
 py main.py -h (shows help)
 
 py main.py (downloads flac by default)
+
 py main.py -l (downloads mp3 versions)
 
 while running, if the playlist is long enough, the program may ask you to complete the captcha required multiple times. Its a hacky solution but I couldnt think of any other way to do it. Unless I find a better data source to get flac files for free. 
