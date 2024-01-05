@@ -22,7 +22,7 @@ if not os.path.exists(musicPath):
 parser = argparse.ArgumentParser()
 
 # add arguments
-parser.add_argument("-l", action="store_true", help="Download in mp3 instead (default is flac)")
+parser.add_argument("-l", action="store_true", help="Download in flac instead (default is mp3)")
 parser.add_argument("-c", "--Captcha")
 
 
@@ -31,9 +31,9 @@ args = parser.parse_args()
 
 # handle file_type arg
 if args.l:
-    file_type = "mp3"
-else:
     file_type = "flac"
+else:
+    file_type = "mp3"
 
 key = "k7xoeo5zc5osjouuaee4"
 cookie = "6c541eg0fv112k8p0em17of3i4"
